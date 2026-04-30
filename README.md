@@ -119,10 +119,8 @@ docs/
 ## Documentation
 
 - [CHANGELOG.md](CHANGELOG.md) — release notes; the v1.0.0 entry covers the safety invariant and every R1–R20 risk decision
-- [docs/PRD.md](docs/PRD.md) — full product requirements, including patterns and finding schemas
 - [docs/severity-rubric.md](docs/severity-rubric.md) — severity definitions and per-pattern rationale
 - [docs/schema-changelog.md](docs/schema-changelog.md) — wire-shape compatibility policy
-- [docs/non-goals.md](docs/non-goals.md) — explicit non-goals and recommended workarounds
 
 ## Contributing
 
