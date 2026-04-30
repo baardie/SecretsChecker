@@ -1,0 +1,104 @@
+name: Release
+
+# Triggers on annotated semver tags (v1.0.0, v1.2.3-rc.1, etc.). The CI workflow
+# (build + test + pack) runs on every push; this workflow assumes the tagged commit
+# already passed it, then publishes to NuGet.org and cuts a GitHub Release.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create the GitHub Release
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  release:
+    name: Pack + publish + release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          # Tag is "vX.Y.Z[-suffix]"; strip the leading "v" for the package version.
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Tag $tag -> version $version"
+
+      - name: Restore
+        run: dotnet restore SecretsChecker.slnx
+
+      - name: Build
+        run: dotnet build SecretsChecker.slnx -c Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Test
+        run: dotnet test SecretsChecker.slnx -c Release --no-build --logger "console;verbosity=normal"
+
+      - name: Pack
+        run: |
+          dotnet pack src/SecretsScanner.Core/SecretsScanner.Core.csproj -c Release -o artifacts -p:Version=${{ steps.version.outputs.version }} --no-build
+          dotnet pack src/SecretsScanner.Cli/SecretsScanner.Cli.csproj   -c Release -o artifacts -p:Version=${{ steps.version.outputs.version }} --no-build
+          dotnet pack src/SecretsScanner.Mcp/SecretsScanner.Mcp.csproj   -c Release -o artifacts -p:Version=${{ steps.version.outputs.version }} --no-build
+
+      - name: Upload nupkgs as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs-${{ steps.version.outputs.version }}
+          path: artifacts/*
+
+      - name: Push to NuGet.org
+        # --skip-duplicate makes re-runs of the same tag idempotent (NuGet versions are
+        # immutable; a re-push of an already-published version is a no-op).
+        run: |
+          dotnet nuget push "artifacts/*.nupkg" \
+            --api-key "${{ secrets.NUGET_API_KEY }}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - name: Extract changelog section for this version
+        id: changelog
+        run: |
+          # Pull the body of the [X.Y.Z] section out of CHANGELOG.md so the GitHub Release
+          # body matches the canonical changelog. Falls back to a generic message if the
+          # version isn't found.
+          version="${{ steps.version.outputs.version }}"
+          if grep -q "^## \[${version}\]" CHANGELOG.md; then
+            awk -v v="${version}" '
+              $0 ~ "^## \\[" v "\\]" { capture=1; next }
+              capture && /^## \[/ { exit }
+              capture { print }
+            ' CHANGELOG.md > release-body.md
+          else
+            echo "Release v${version}. See CHANGELOG.md for details." > release-body.md
+          fi
+          echo "Generated release body ($(wc -l < release-body.md) lines):"
+          head -20 release-body.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-body.md
+          files: artifacts/*.nupkg
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

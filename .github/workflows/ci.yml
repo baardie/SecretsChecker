@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build-and-test:
+    name: Build + test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # history-scan E2E tests need full history
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore SecretsChecker.slnx
+
+      - name: Build
+        run: dotnet build SecretsChecker.slnx -c Release --no-restore
+
+      - name: Test (all suites)
+        run: dotnet test SecretsChecker.slnx -c Release --no-build --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=normal"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: '**/TestResults/*.trx'
+
+  bench-validate:
+    name: Bench harness validate
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Validate bench harness
+        # Builds the bench fixtures and runs each scan once. Asserts elapsed wall-clock
+        # against R10 ceilings: working-tree < 10s, history < 30s for 1000 commits.
+        run: |
+          dotnet run -c Release --project tests/SecretsScanner.Bench/SecretsScanner.Bench.csproj -- \
+            validate --files 1000 --commits 1000
+
+  pack:
+    name: Pack tools
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Pack Core, CLI, and MCP
+        run: |
+          dotnet pack src/SecretsScanner.Core/SecretsScanner.Core.csproj -c Release -o artifacts
+          dotnet pack src/SecretsScanner.Cli/SecretsScanner.Cli.csproj -c Release -o artifacts
+          dotnet pack src/SecretsScanner.Mcp/SecretsScanner.Mcp.csproj -c Release -o artifacts
+
+      - name: Upload nupkgs
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs
+          path: artifacts/*.nupkg
+
+  dogfood:
+    name: Scan this repo with the freshly built CLI
+    runs-on: ubuntu-latest
+    needs: pack
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nupkgs
+          path: artifacts
+
+      - name: Install the just-packed CLI
+        run: dotnet tool install --tool-path .tools --add-source artifacts dotnet-tool-secrets-scan --version 1.0.0
+
+      - name: Working-tree scan
+        # Eat-our-own-cooking: the tool must not flag its own source.
+        run: ./.tools/dotnet-tool-secrets-scan --severity medium --color never
+
+      - name: History scan
+        # Bound the walk to recent history so this remains fast as the repo grows.
+        run: ./.tools/dotnet-tool-secrets-scan history --max-commits 200 --severity high --color never
