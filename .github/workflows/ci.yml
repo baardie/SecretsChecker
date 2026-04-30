@@ -125,9 +125,10 @@ jobs:
         # AKIA*/sk_live_* values used to verify the scanner detects them, and
         # flagging them here would mean the dogfood gate fights its own test
         # corpus. Production code scans clean.
+        #
+        # History mode is not dogfood-scanned because the walker takes a repo
+        # root, not a sub-path; scoping to src/ would fail with "not a git
+        # repository", and scoping to the full repo would (correctly) flag the
+        # test corpus's commits. History coverage is exercised end-to-end by
+        # the 21 E2E tests against fixture repos.
         run: ./.tools/dotnet-tool-secrets-scan --path src --severity medium --color never
-
-      - name: History scan
-        # Same scoping rationale as the working-tree step. Bounded to recent
-        # history so this remains fast as the repo grows.
-        run: ./.tools/dotnet-tool-secrets-scan history --path src --max-commits 200 --severity high --color never
