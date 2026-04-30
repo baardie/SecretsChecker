@@ -28,7 +28,7 @@ public sealed class WorkspaceBoundary
 
     public WorkspaceBoundary(string root)
     {
-        Root = NormaliseDirectory(Path.GetFullPath(root));
+        Root = NormaliseDirectory(StripMacosPrivatePrefix(Path.GetFullPath(root)));
     }
 
     /// <summary>
@@ -55,7 +55,7 @@ public sealed class WorkspaceBoundary
         string canonical;
         try
         {
-            canonical = Path.GetFullPath(path);
+            canonical = StripMacosPrivatePrefix(Path.GetFullPath(path));
         }
         catch (Exception)
         {
@@ -184,6 +184,27 @@ public sealed class WorkspaceBoundary
 
     private static string NormaliseDirectory(string path)
         => path.Length > 1 ? path.TrimEnd(Path.DirectorySeparatorChar) : path;
+
+    /// <summary>
+    /// macOS-only: <c>/var</c>, <c>/tmp</c>, and <c>/etc</c> are all symlinks into
+    /// <c>/private</c>. <see cref="Path.GetFullPath"/> doesn't resolve symlinks, but
+    /// <see cref="Directory.GetCurrentDirectory"/> (and anything derived from it) does, so
+    /// the same directory can be referred to by two cosmetically different absolute paths.
+    /// Stripping the leading <c>/private</c> normalises both forms to the conventional
+    /// short form before any string comparison happens.
+    /// </summary>
+    private static string StripMacosPrivatePrefix(string canonical)
+    {
+        if (!OperatingSystem.IsMacOS())
+        {
+            return canonical;
+        }
+        if (canonical.StartsWith("/private/", StringComparison.Ordinal))
+        {
+            return canonical.Substring("/private".Length);
+        }
+        return canonical;
+    }
 }
 
 /// <summary>
