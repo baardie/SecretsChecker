@@ -120,9 +120,14 @@ jobs:
         run: dotnet tool install --tool-path .tools --add-source artifacts dotnet-tool-secrets-scan --version 1.0.0
 
       - name: Working-tree scan
-        # Eat-our-own-cooking: the tool must not flag its own source.
-        run: ./.tools/dotnet-tool-secrets-scan --severity medium --color never
+        # Eat-our-own-cooking: the tool must not flag its own production source.
+        # tests/ is intentionally excluded — those fixtures contain placeholder
+        # AKIA*/sk_live_* values used to verify the scanner detects them, and
+        # flagging them here would mean the dogfood gate fights its own test
+        # corpus. Production code scans clean.
+        run: ./.tools/dotnet-tool-secrets-scan --path src --severity medium --color never
 
       - name: History scan
-        # Bound the walk to recent history so this remains fast as the repo grows.
-        run: ./.tools/dotnet-tool-secrets-scan history --max-commits 200 --severity high --color never
+        # Same scoping rationale as the working-tree step. Bounded to recent
+        # history so this remains fast as the repo grows.
+        run: ./.tools/dotnet-tool-secrets-scan history --path src --max-commits 200 --severity high --color never
