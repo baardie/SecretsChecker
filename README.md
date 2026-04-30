@@ -37,7 +37,7 @@ dotnet tool-secrets-scan --install-hook
 
 Exit codes: `0` no findings, `1` findings present, `2` tool error (bad args, not a git repo, cap-policy hit).
 
-See [docs/PRD.md](docs/PRD.md#cli-usage) for the full flag list.
+See [docs/usage.md](docs/usage.md) for the full flag list, configuration sources, and common invocation patterns.
 
 ### 2. Claude Code MCP server
 
@@ -119,6 +119,7 @@ docs/
 ## Documentation
 
 - [CHANGELOG.md](CHANGELOG.md) — release notes; the v1.0.0 entry covers the safety invariant and every R1–R20 risk decision
+- [docs/usage.md](docs/usage.md) — full flag list, configuration sources, exit codes, and invocation cookbook
 - [docs/severity-rubric.md](docs/severity-rubric.md) — severity definitions and per-pattern rationale
 - [docs/schema-changelog.md](docs/schema-changelog.md) — wire-shape compatibility policy
 
