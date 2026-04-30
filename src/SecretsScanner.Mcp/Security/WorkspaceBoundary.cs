@@ -123,24 +123,39 @@ public sealed class WorkspaceBoundary
             return false;
         }
 
+        // POSIX: paths under the user's HOME or the system per-user temp directory are
+        // never on the deny list, even if they happen to live under one of the denied roots.
+        // This matters on macOS in particular, where Path.GetTempPath() returns
+        // /var/folders/<id>/T/... — under the /var deny entry but a legitimate user area.
+        var posixHome = Environment.GetEnvironmentVariable("HOME")
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(posixHome) && StartsWithDir(canonical, posixHome))
+        {
+            return false;
+        }
+
+        var tempPrefix = Path.GetTempPath();
+        if (!string.IsNullOrEmpty(tempPrefix) && StartsWithDir(canonical, tempPrefix))
+        {
+            return false;
+        }
+
         foreach (var denied in PosixDeniedRoots)
         {
             if (canonical.Equals(denied, StringComparison.Ordinal))
             {
                 return true;
             }
+
+            // "/" only matches exactly; without this guard, StartsWithDir(candidate, "/")
+            // matches every absolute path on POSIX and the boundary denies everything.
+            if (denied == "/")
+            {
+                continue;
+            }
+
             if (StartsWithDir(canonical, denied))
             {
-                // Allow /home/<current-user> when matched via /home generic root.
-                if (denied is "/home" or "/Users")
-                {
-                    var home = Environment.GetEnvironmentVariable("HOME")
-                        ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                    if (!string.IsNullOrEmpty(home) && StartsWithDir(canonical, home))
-                    {
-                        continue;
-                    }
-                }
                 return true;
             }
         }
