@@ -34,7 +34,7 @@ The tool does not call the underlying provider to check whether a detected key i
 
 ## Scanning non-.NET projects
 
-Patterns are .NET-first: AST-aware on `*.cs`, key-shape-aware on `*.json`/`*.config`/`*.env`. Scanning a Python or Go repo will work — the regex-only patterns still fire — but coverage is intentionally narrower than a general-purpose tool.
+Patterns are .NET-first: AST-based detection on *.cs. Tier A regex with entropy + placeholder filtering covers the common cases; Roslyn syntax-tree analysis is deferred to v1.x. The dependency was removed pre-release to avoid shipping a half-implemented feature, key-shape-aware on `*.json`/`*.config`/`*.env`. Scanning a Python or Go repo will work — the regex-only patterns still fire — but coverage is intentionally narrower than a general-purpose tool.
 
 **Workaround:** for non-.NET stacks, use [gitleaks](https://github.com/gitleaks/gitleaks) (broad coverage) and consider adding a tool-specific rule pack rather than working around .NET's particular file types.
 
