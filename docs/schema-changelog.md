@@ -2,6 +2,11 @@
 
 Wire-shape compatibility policy for everything this tool emits: JSON output, SARIF output, MCP tool inputs/outputs, baseline files, exit codes.
 
+Detection tiers
+
+Tier A (current, v1.0): Compiled regex patterns with keyword pre-filter, Shannon entropy validation, and placeholder rejection. Covers the documented 20 categories.
+Tier B (roadmap, v1.x): Roslyn AST analysis for context-aware detection of connection strings, bearer tokens, and credential assignments where regex produces false positives. Dependency was deliberately not shipped in v1.0.
+
 ## Versioning surfaces
 
 | Surface | Version field | Where it lives |
