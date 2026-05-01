@@ -31,7 +31,7 @@ Severity is the most actionable single field in a finding. The rubric below is t
 | **Generic password / credential field outside config files** | Medium | Source code rarely has a legitimate plaintext password; AST detection cuts most false positives, but the value could still be a placeholder, test value, or doc snippet. |
 | **High-entropy string (opt-in)** | Medium | Heuristic signal only. Off by default. False-positive on minified or generated files; expect noise. |
 | **Slack webhook / token** | High | Exfiltration of channel content; can post as the bot. Bounded by the bot's permissions. |
-| **Connection-string-like value found via Roslyn AST in `.cs`** | Critical | Same urgency as JSON-config detections — a hardcoded prod string in source is no less leaked than one in `appsettings.Production.json`. |
+| **Connection-string-like value matched in .cs source by the Tier A regex pipeline. Tier B (Roslyn AST-based) detection is on the v1.x roadmap.** | Critical | Same urgency as JSON-config detections — a hardcoded prod string in source is no less leaked than one in `appsettings.Production.json`. |
 
 ## Operating principles
 
