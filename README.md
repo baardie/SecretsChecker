@@ -85,7 +85,7 @@ A composite GitHub Action (`baardie/dotnet-tool-secrets-scan-action`) is on the 
 | Secrets and keys | JWT signing secrets, hardcoded bearer tokens, private keys / certificates |
 | Generic | API key fields, password fields in config files; opt-in high-entropy heuristic |
 
-Patterns are .NET-first: AST-aware on `*.cs` (Roslyn), key-aware on `*.json`/`*.config`/`*.env`.
+Patterns are .NET-first with a layered detection pipeline: keyword pre-filter, compiled regex with 200ms timeout, Shannon entropy validation, and placeholder rejection. Files are extension-filtered before scanning rather than structurally parsed — minimal dependencies, predictable performance on large repos. AST-based detection (Tier B) is on the v1.x roadmap; the Roslyn dependency was removed pre-release rather than shipped half-implemented.
 
 ## Severity tiers
 
